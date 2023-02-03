@@ -236,7 +236,8 @@ struct FilterExecStream {
     baseline_metrics: BaselineMetrics,
 }
 
-fn batch_filter(
+/// Exported for sync usage in pvd-Jade
+pub fn batch_filter(
     batch: &RecordBatch,
     predicate: &Arc<dyn PhysicalExpr>,
 ) -> ArrowResult<RecordBatch> {
