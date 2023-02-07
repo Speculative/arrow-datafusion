@@ -274,7 +274,7 @@ impl ExecutionPlan for ProjectionExec {
 
 /// If e is a direct column reference, returns the field level
 /// metadata for that field, if any. Otherwise returns None
-fn get_field_metadata(
+pub fn get_field_metadata(
     e: &Arc<dyn PhysicalExpr>,
     input_schema: &Schema,
 ) -> Option<HashMap<String, String>> {
@@ -314,6 +314,27 @@ fn stats_projection(
         column_statistics,
         // TODO stats: knowing the type of the new columns we can guess the output size
         total_byte_size: None,
+    }
+}
+
+/// Exported for sync usage in pvd-Jade
+pub fn batch_project(
+    expr: Vec<Arc<dyn PhysicalExpr>>,
+    schema: SchemaRef,
+    batch: &RecordBatch,
+) -> ArrowResult<RecordBatch> {
+    // records time on drop
+    let arrays = expr
+        .iter()
+        .map(|expr| expr.evaluate(batch))
+        .map(|r| r.map(|v| v.into_array(batch.num_rows())))
+        .collect::<Result<Vec<_>>>()?;
+
+    if arrays.is_empty() {
+        let options = RecordBatchOptions::new().with_row_count(Some(batch.num_rows()));
+        RecordBatch::try_new_with_options(schema.clone(), arrays, &options)
+    } else {
+        RecordBatch::try_new(schema.clone(), arrays)
     }
 }
 
